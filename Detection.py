@@ -3,6 +3,7 @@ import cv2
 import time
 
 from NetworkManager import NetworkManager
+from ImageStitching import ImageStitcher
 
 #gives color range to be detected
 def getColorRange():
@@ -66,48 +67,60 @@ def drawContours(contours):
             break
     return contourList
 
+
+def return_coord(cap, cap2, sock, stitcher):
+    _, frame = cap.read()
+    _, frame2 = cap2.read()
+    
+    #frame = rescaleFrame(frame)
+    #frame2 = rescaleFrame(frame2)
+    filteredFrame, res = filterFrame(frame)
+    filteredFrame2, res2 = filterFrame(frame2)
+    contours = contourFilteredFrame(filteredFrame)
+    contours2 = contourFilteredFrame(filteredFrame2)
+    contourList = drawContours(contours)
+    contourList2 = drawContours(contours2)
+    for x,y,radius in contourList:
+        cv2.circle(frame, (int(x), int(y)), int(radius), (0, 0, 255), 2)
+        #cv2.circle(frame, (int(x), int(y)), 5, (0, 0, 255), -1)
+        #sock.send_coord(str(int(x)) + str(int(y)))
+        coord1 = (int(x), int(y))
+    for x, y, radius in contourList2:
+        cv2.circle(frame2, (int(x), int(y)), int(radius), (0, 0, 255), 2)
+        #sock.send_coord(str(int(x)) + str(int(y)))
+        coord2 = (int(x), int(y))
+    #for error 'a bytes-like object is required, not'str''
+    #b1= bytes(str(xPos) + str(yPos), encode='utf-8')
+    #sock.sendto(b1,(UDP_IP,UDP_PORT))
+    #sock.sendto(str(xPos) + str(yPos), (UDP_IP, UDP_PORT))
+    stitched_image = stitcher.stitch(frame,frame2)
+    #cv2.imshow("stitchedImage", stitched_image)
+    cv2.imshow("1", frame)
+    cv2.imshow("2", frame2)
+    #cv2.imshow("combin", stitched_image)
+    return coord1, coord2
+            
                      
 def main():
     #set up sockets
     sock = NetworkManager()
+    #set up image stitching
+    stitcher = ImageStitcher()
     #set up video
     cap = cv2.VideoCapture(0)
-    cap2 = cv2.VideoCapture(1)
+    cap2 = cv2.VideoCapture(2)
     #buffer to load video
     time.sleep(2.0)
     #main cv2 video loop
     while(True):
         #read frames
-        _, frame = cap.read()
-        _, frame2 = cap2.read()
-        frame = rescaleFrame(frame)
-        frame2 = rescaleFrame(frame2)
-        filteredFrame, res = filterFrame(frame)
-        filteredFrame2, res2 = filterFrame(frame2)
-        contours = contourFilteredFrame(filteredFrame)
-        contours2 = contourFilteredFrame(filteredFrame2)
-        contourList = drawContours(contours)
-        contourList2 = drawContours(contours2)
-        for x,y,radius in contourList:
-            cv2.circle(frame, (int(x), int(y)), int(radius), (0, 0, 255), 2)
-            #cv2.circle(frame, (int(x), int(y)), 5, (0, 0, 255), -1)
-            sock.send_coord(str(int(x)) + str(int(y)))
-        for x, y, radius in contourList2:
-            cv2.circle(frame2, (int(x), int(y)), int(radius), (0, 0, 255), 2)
-            sock.send_coord(str(int(x)) + str(int(y)))
-        #for error 'a bytes-like object is required, not'str''
-        #b1= bytes(str(xPos) + str(yPos), encode='utf-8')
-        #sock.sendto(b1,(UDP_IP,UDP_PORT))
-        #sock.sendto(str(xPos) + str(yPos), (UDP_IP, UDP_PORT))
-        cv2.imshow("x-axis", frame)
-        cv2.imshow("y-axis", frame2)
-        
+        coord1, coord2 = return_coord(cap, cap2, sock, stitcher)
         #if condition is met, break out of loop
         ch = cv2.waitKey(1)
         if ch & 0xFF == ord('q'):
             break
-            
     cap.release()
+    cap2.release()
     cv2.destroyAllWindows()
     
 if __name__ == "__main__":
